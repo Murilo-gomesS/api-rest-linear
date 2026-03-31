@@ -1,0 +1,51 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: estruturas-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../API/platform-back
+    container_name: estruturas-backend
+    environment:
+      - PORT=8080
+      - MONGO_URI=mongodb://mongo:27017/unilaunch
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const s=require('net').connect(8080,'127.0.0.1');s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1));"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: estruturas-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8080
+      - VITE_ENABLE_MOCK_MODE=true
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+volumes:
+  mongo_data:
